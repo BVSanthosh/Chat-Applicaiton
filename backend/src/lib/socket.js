@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import http from "http";
 import express from "express";
+import User from "../models/user.model.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -11,29 +12,32 @@ const io = new Server(server, {
     },
 });
 
-const userSocketMap = {};
-
-export function getReceiverSocketId(userId) {
-    return userSocketMap[userId];
-};
-
-io.on("connection", (socket) => {
+io.on("connection", async (socket) => {
     console.log("A user connected: ", socket.id);
 
     const userId = socket.handshake.query.userId;
 
-    if (userId) {
-        userSocketMap[userId] = socket.id;
+    if (!userId) {
+        console.log("User ID not provided");
+        return;
     }
 
-    io.emit("getOnlineUsers", Object.keys(userSocketMap));
+    try {
+        await User.updateOne({_id: userId}, {socketId: socket.id}).exec();
+
+        io.emit("userOnline", userId);
+    } catch(error) {
+        console.error("Error updating socket ID: ", error);
+    }
 
     socket.on("disconnect", () => {
         console.log("A user disconnected: ", socket.id);
 
-        delete userSocketMap[userId];
-
-        io.emit("getOnlineUsers", Object.keys(userSocketMap));
+        if (userId) {
+            io.emit("userOffline", userId);
+        } else {
+            console.log("User ID not available on disconnect");
+        }
     })
 });
 
