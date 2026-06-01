@@ -11,7 +11,7 @@ Chatcast is a modern real-time communication platform that blends live audio dis
 ## 🛠 Tech Stack
 
 ### Frontend
-- **React** + **TypeScript**
+- **React** + **JavaScript**
 - **Tailwind CSS** for styling
 - **React Router** for routing
 - **Socket.IO** (client) for real-time messaging
