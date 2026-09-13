@@ -1,13 +1,27 @@
 {
-  "name": "chat-app",
+  "name": "chatcast",
   "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "build": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
-    "start": "npm run start --prefix backend"
-  },
-  "keywords": [],
-  "author": "",
+  "private": true,
+  "description": "Real-time chat on a single Cloudflare Worker, with D1 and Durable Objects",
   "license": "ISC",
-  "description": ""
+  "scripts": {
+    "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend",
+    "predev": "npm run build",
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "wrangler dev",
+    "dev:web": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "lint": "npm run lint --prefix frontend",
+    "preview": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply chatcast --local",
+    "db:migrate:remote": "wrangler d1 migrations apply chatcast --remote",
+    "db:seed:local": "node backend/scripts/seed.js --local",
+    "db:seed:remote": "node backend/scripts/seed.js --remote",
+    "migrate:mongo": "node backend/scripts/migrate-from-mongo.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "wrangler": "^4.131.1"
+  }
 }

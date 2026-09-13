@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuthStore } from "../store/useAuthStore";
+import { useAuthStore } from "../store/useAuthStore.js";
 import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import AuthImagePattern from "../components/AuthImagePattern.jsx";
@@ -14,25 +14,33 @@ const SignUpPage = () => {
         password: "",
     });
 
+    // `toast.error()` returns a toast id, which is a truthy string. Returning it
+    // straight out of the guards meant every "failed" check still reported
+    // success, so the form submitted no matter what was in it.
     const validateForm = () => {
         if (!formData.fullName.trim()) {
-            return toast.error("Full name is required");
+            toast.error("Full name is required");
+            return false;
         }
 
         if (!formData.email.trim()) {
-            return toast.error("Email is required");
+            toast.error("Email is required");
+            return false;
         }
 
         if (!/\S+@\S+\.\S+/.test(formData.email)) {
-            return toast.error("Invalid email format");
+            toast.error("Invalid email format");
+            return false;
         }
 
         if (!formData.password.trim()) {
-            return toast.error("Password is required");
+            toast.error("Password is required");
+            return false;
         }
 
         if (formData.password.length < 8) {
-            return toast.error("Password must be at least 8 characters long");
+            toast.error("Password must be at least 8 characters long");
+            return false;
         }
 
         return true;
@@ -41,10 +49,8 @@ const SignUpPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        const success = validateForm();
-
-        if (success) {
-            signup(formData);
+        if (validateForm()) {
+            await signup(formData);
         }
     };
 

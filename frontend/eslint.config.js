@@ -5,7 +5,16 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default [
-  { ignores: ['dist'] },
+  { ignores: ['dist', '.wrangler'] },
+  {
+    // Build config files run in Node, not the browser.
+    files: ['vite.config.js', 'tailwind.config.js', 'postcss.config.js', 'eslint.config.js'],
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
+    },
+    rules: { ...js.configs.recommended.rules },
+  },
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {

@@ -1,0 +1,70 @@
+# One Worker serves the whole app: the built React frontend as static assets,
+# and the API from the same origin under /api/*.
+name = "chatcast"
+main = "backend/src/index.js"
+compatibility_date = "2025-09-01"
+
+[observability]
+enabled = true
+
+# ---------------------------------------------------------------------------
+# Static assets — the Vite build output. Run `npm run build` before deploying.
+#
+# `not_found_handling` serves the SPA shell for client-side routes so a hard
+# refresh on /profile does not 404. `run_worker_first` is what keeps that from
+# swallowing the API: without it, /api/* matches no asset and would be handed
+# the index.html fallback instead of reaching the router.
+# ---------------------------------------------------------------------------
+[assets]
+directory = "frontend/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# ---------------------------------------------------------------------------
+# D1 (SQLite) — replaces MongoDB.
+# Create it once with:  npx wrangler d1 create chatcast
+# then paste the printed database_id below.
+# ---------------------------------------------------------------------------
+[[d1_databases]]
+binding = "DB"
+database_name = "chatcast"
+database_id = "ad08ce57-07f7-4b0e-b30f-756af17a70aa"
+migrations_dir = "backend/migrations"
+
+# ---------------------------------------------------------------------------
+# Durable Object — replaces the Socket.IO server. Holds the live WebSocket
+# connections, tracks presence and fans out new messages.
+# ---------------------------------------------------------------------------
+[[durable_objects.bindings]]
+name = "PRESENCE"
+class_name = "PresenceRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PresenceRoom"]
+
+# ---------------------------------------------------------------------------
+# Native rate limiting, keyed per client IP for auth and per user id for
+# writes. Enforced locally under `wrangler dev` as well as in production.
+# ---------------------------------------------------------------------------
+[[ratelimits]]
+name = "AUTH_LIMITER"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }
+
+[[ratelimits]]
+name = "WRITE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 60, period = 60 }
+
+# ---------------------------------------------------------------------------
+# Public, non-secret config. Secrets go through `wrangler secret put`.
+# Frontend and API share an origin, so the session cookie can stay SameSite=Lax
+# and there is no CORS allowlist to keep in sync.
+# ---------------------------------------------------------------------------
+[vars]
+APP_ENV = "production"
+COOKIE_SAMESITE = "lax"
+PBKDF2_ITERATIONS = "100000"
+MAX_UPLOAD_BYTES = "5242880"

@@ -3,6 +3,7 @@ import { useAuthStore } from "../store/useAuthStore.js";
 import { Link } from "react-router-dom";
 import { Mail, MessageSquare, Lock, Loader2, EyeOff, Eye } from "lucide-react";
 import AuthImagePattern from "../components/AuthImagePattern.jsx";
+import toast from "react-hot-toast";
 
 const LogInPage = () => {
     const { login, isLoggingIn } = useAuthStore();
@@ -15,7 +16,12 @@ const LogInPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        login(formData);
+        if (!formData.email.trim() || !formData.password) {
+            toast.error("Enter your email and password");
+            return;
+        }
+
+        await login(formData);
     };
 
     return (

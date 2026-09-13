@@ -1,37 +1,55 @@
-import express from "express";
-import dotenv from "dotenv";
-import cookieParser from "cookie-parser";
-import cors from "cors";
-import path from "path";
-import authRoutes from "./routes/auth.route.js";
-import messageRoutes from "./routes/message.route.js";
-import { connectDB } from "./lib/db.js";
-import { app, server } from "./lib/socket.js"
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { assertConfigured } from "./lib/config.js";
+import { enforceOrigin, securityHeaders } from "./middleware/security.js";
+import authRoutes from "./routes/auth.js";
+import messageRoutes from "./routes/messages.js";
+import realtimeRoutes from "./routes/realtime.js";
 
-dotenv.config();
+export { PresenceRoom } from "./realtime/PresenceRoom.js";
 
-const PORT = process.env.PORT
-const __dirname = path.resolve();
+const app = new Hono();
 
-app.use(cors({
-    origin: "http://localhost:5173",
-    credentials: true,
-}));
-app.use(express.json());
-app.use(cookieParser());
+// A 101 response is immutable and must be returned untouched, so the header
+// middleware steps aside for the WebSocket upgrade. Its own ticket check is
+// what authorises that request.
+const isSocketUpgrade = (c) => c.req.header("upgrade")?.toLowerCase() === "websocket";
 
-app.use("/api/auth", authRoutes);
-app.use("/api/messages", messageRoutes);
+app.use("*", async (c, next) => (isSocketUpgrade(c) ? next() : securityHeaders(c, next)));
+app.use("*", async (c, next) => (isSocketUpgrade(c) ? next() : enforceOrigin(c, next)));
 
-if (process.env.NODE_ENV === "production") {
-    app.use(express.static(path.join(__dirname, "../frontend/dist")));
+app.get("/api/health", (c) => c.json({ status: "ok" }));
 
-    app.get("*", (req, res) => {
-        res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
-    });
-}
+app.route("/api/auth", authRoutes);
+app.route("/api/messages", messageRoutes);
+app.route("/api/realtime", realtimeRoutes);
 
-server.listen(PORT, () => {
-    console.log("Server is running on port: " + PORT);
-    connectDB();
+// Only /api/* is routed to the Worker (see `run_worker_first` in
+// wrangler.toml); everything else is served from the asset store. So anything
+// reaching this point is an unknown API path, not a missing page.
+app.notFound(() => Response.json({ message: "Not found" }, { status: 404 }));
+
+app.onError((error) => {
+  if (error instanceof HTTPException) {
+    return error.getResponse();
+  }
+
+  // Never leak internals to the client; the detail goes to the Workers log.
+  console.error("Unhandled error", error?.stack ?? error);
+
+  return Response.json({ message: "Internal server error" }, { status: 500 });
 });
+
+export default {
+  async fetch(request, env, ctx) {
+    try {
+      assertConfigured(env);
+    } catch (error) {
+      console.error("Startup configuration error", error.message);
+
+      return Response.json({ message: "Server is not configured correctly" }, { status: 500 });
+    }
+
+    return app.fetch(request, env, ctx);
+  },
+};
